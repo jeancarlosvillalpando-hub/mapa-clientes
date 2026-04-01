@@ -13,6 +13,12 @@
 
 .popup { max-height: 250px; overflow-y: auto; }
 
+.cliente {
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 5px;
+  padding-bottom: 5px;
+}
+
 .btn {
   display: inline-block;
   margin-top: 3px;
@@ -40,7 +46,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?output=csv";
 
-// 📅 FECHA
+// 📅 VALIDAR FECHA
 function estaVencido(fecha) {
   if (!fecha) return false;
 
@@ -84,10 +90,9 @@ function csvToJSON(csv) {
   return result;
 }
 
-// 🚀 OPTIMIZADOR SIMPLE
+// 🚀 OPTIMIZADOR
 function optimizarRuta(clientes) {
 
-  // Ordena por latitud (simple pero efectivo)
   clientes.sort((a,b) => parseFloat(a.Lat) - parseFloat(b.Lat));
 
   let base = clientes[0].Direccion;
@@ -98,7 +103,7 @@ function optimizarRuta(clientes) {
   window.open(url);
 }
 
-// 🚀 CARGAR
+// 🚀 CARGAR DATOS
 async function cargarDatos() {
 
   const res = await fetch(sheetURL);
@@ -119,7 +124,7 @@ async function cargarDatos() {
     let lat = parseFloat(clientes[0].Lat);
     let lng = parseFloat(clientes[0].Lng);
 
-    let html = `<b>ZIP: ${zip}</b><br><br>`;
+    let html = `<div class="popup"><b>ZIP: ${zip}</b><br><br>`;
 
     clientes.forEach(c => {
 
@@ -127,29 +132,37 @@ async function cargarDatos() {
       let color = vencido ? "red" : "green";
 
       html += `
-        <div>
+        <div class="cliente">
           <b>${c.Nombre}</b><br>
-          ${c.Direccion}<br>
+          📞 ${c.Telefono}<br>
+          📧 ${c.Email}<br>
+          📍 ${c.Direccion}<br>
+          🗑️ ${c.HoraBasura}<br>
+          💳 ${c.Membresia}<br>
+          🔄 ${c.Renovacion}<br>
+
           <span style="color:${color}">
-            ${vencido ? "VENCIDO" : "ACTIVO"}
+            ${vencido ? "🔴 VENCIDO" : "🟢 ACTIVO"}
           </span><br>
 
-          <a class="btn" href="tel:${c.Telefono}">📞</a>
+          <a class="btn" href="tel:${c.Telefono}">📞 Llamar</a>
+
           <a class="btn" target="_blank"
           href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.Direccion)}">
-          📍
+          📍 Ver en Maps
           </a>
-        </div><hr>
+        </div>
       `;
     });
 
-    // 🔥 BOTÓN DE RUTA
     html += `
       <button onclick='optimizarRuta(${JSON.stringify(clientes)})'
       class="btn" style="background:green">
       🚀 Optimizar Ruta
       </button>
     `;
+
+    html += `</div>`;
 
     L.marker([lat, lng]).addTo(map).bindPopup(html);
   }
