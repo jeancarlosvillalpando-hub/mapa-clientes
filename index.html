@@ -11,16 +11,7 @@
 <style>
 #map { height: 100vh; }
 
-.popup {
-  max-height: 250px;
-  overflow-y: auto;
-}
-
-.cliente {
-  border-bottom: 1px solid #ccc;
-  margin-bottom: 5px;
-  padding-bottom: 5px;
-}
+.popup { max-height: 250px; overflow-y: auto; }
 
 .btn {
   display: inline-block;
@@ -43,24 +34,26 @@
 
 <script>
 
-// 📍 MAPA
 var map = L.map('map').setView([29.7604, -95.3698], 10);
 
-// 🌎 BASE
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// 🔗 CSV
 const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?output=csv";
 
 // 📅 FECHA
 function estaVencido(fecha) {
   if (!fecha) return false;
+
+  const partes = fecha.split("-");
+  const fechaCliente = new Date(partes[0], partes[1]-1, partes[2]);
+
   const hoy = new Date();
-  const f = new Date(fecha + "T23:59:59");
-  return f < hoy;
+  const hoyClean = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+
+  return hoyClean > fechaCliente;
 }
 
-// 🔄 CSV ROBUSTO
+// 🔄 CSV
 function csvToJSON(csv) {
   const lines = csv.split("\n");
   const headers = lines[0].split(",");
@@ -91,6 +84,20 @@ function csvToJSON(csv) {
   return result;
 }
 
+// 🚀 OPTIMIZADOR SIMPLE
+function optimizarRuta(clientes) {
+
+  // Ordena por latitud (simple pero efectivo)
+  clientes.sort((a,b) => parseFloat(a.Lat) - parseFloat(b.Lat));
+
+  let base = clientes[0].Direccion;
+  let waypoints = clientes.slice(1).map(c => encodeURIComponent(c.Direccion)).join("/");
+
+  let url = `https://www.google.com/maps/dir/${encodeURIComponent(base)}/${waypoints}`;
+
+  window.open(url);
+}
+
 // 🚀 CARGAR
 async function cargarDatos() {
 
@@ -98,41 +105,21 @@ async function cargarDatos() {
   const csv = await res.text();
   const data = csvToJSON(csv);
 
-  // 🔥 AGRUPAR POR ZIP
   const grupos = {};
 
-  for (const c of data) {
+  data.forEach(c => {
+    if (!grupos[c.ZIP]) grupos[c.ZIP] = [];
+    grupos[c.ZIP].push(c);
+  });
 
-    const zip = c.ZIP || "Sin ZIP";
-
-    if (!grupos[zip]) {
-      grupos[zip] = [];
-    }
-
-    grupos[zip].push(c);
-  }
-
-  // 🔥 CREAR MARCADORES POR ZIP
   for (const zip in grupos) {
 
     const clientes = grupos[zip];
 
-    let lat = null;
-    let lng = null;
+    let lat = parseFloat(clientes[0].Lat);
+    let lng = parseFloat(clientes[0].Lng);
 
-    // usar primer cliente para ubicación
-    for (const c of clientes) {
-      if (c.Lat && c.Lng) {
-        lat = parseFloat(c.Lat);
-        lng = parseFloat(c.Lng);
-        break;
-      }
-    }
-
-    if (!lat || !lng) continue;
-
-    // 🔥 CONTENIDO POPUP
-    let html = `<div class="popup"><b>ZIP: ${zip}</b><br><br>`;
+    let html = `<b>ZIP: ${zip}</b><br><br>`;
 
     clientes.forEach(c => {
 
@@ -140,34 +127,31 @@ async function cargarDatos() {
       let color = vencido ? "red" : "green";
 
       html += `
-        <div class="cliente">
+        <div>
           <b>${c.Nombre}</b><br>
-          📞 ${c.Telefono}<br>
-          📧 ${c.Email}<br>
-          📍 ${c.Direccion}<br>
-          🗑️ ${c.HoraBasura}<br>
-          💳 ${c.Membresia}<br>
-          🔄 ${c.Renovacion}<br>
-
+          ${c.Direccion}<br>
           <span style="color:${color}">
             ${vencido ? "VENCIDO" : "ACTIVO"}
           </span><br>
 
-          <a class="btn" href="tel:${c.Telefono}">📞 Llamar</a>
-
+          <a class="btn" href="tel:${c.Telefono}">📞</a>
           <a class="btn" target="_blank"
           href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.Direccion)}">
-          📍 Ver en Maps
+          📍
           </a>
-        </div>
+        </div><hr>
       `;
     });
 
-    html += `</div>`;
+    // 🔥 BOTÓN DE RUTA
+    html += `
+      <button onclick='optimizarRuta(${JSON.stringify(clientes)})'
+      class="btn" style="background:green">
+      🚀 Optimizar Ruta
+      </button>
+    `;
 
-    L.marker([lat, lng])
-      .addTo(map)
-      .bindPopup(html);
+    L.marker([lat, lng]).addTo(map).bindPopup(html);
   }
 }
 
