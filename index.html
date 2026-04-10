@@ -45,11 +45,14 @@ var map = L.map('map').setView([29.7604, -95.3698], 10);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// 🔗 TU CSV (YA CORRECTO)
+// 🔗 CSV CON PROXY (evita bloqueos)
 const sheetURL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?gid=1522286567&single=true&output=csv");
+
 // 📅 VALIDAR FECHA
 function estaVencido(fecha) {
   if (!fecha) return false;
+
+  fecha = fecha.replace(/"/g, "").trim();
 
   const partes = fecha.split("-");
   if (partes.length !== 3) return false;
@@ -62,7 +65,7 @@ function estaVencido(fecha) {
   return hoyClean > fechaCliente;
 }
 
-// 🔄 CONVERTIR CSV A JSON (ROBUSTO)
+// 🔄 CSV ROBUSTO
 function csvToJSON(csv) {
   const lines = csv.trim().split("\n");
   const headers = lines[0].split(",");
@@ -91,7 +94,7 @@ function csvToJSON(csv) {
 
     let obj = {};
     headers.forEach((h, j) => {
-      obj[h.trim()] = row[j]?.trim().replace(/^"|"$/g, "");
+      obj[h.trim()] = (row[j] || "").trim().replace(/"/g, "");
     });
 
     result.push(obj);
@@ -100,11 +103,11 @@ function csvToJSON(csv) {
   return result;
 }
 
-// 🚀 OPTIMIZADOR DE RUTA
+// 🚀 OPTIMIZAR RUTA
 function optimizarRuta(clientes) {
 
   if (clientes.length < 2) {
-    alert("Necesitas al menos 2 clientes para ruta");
+    alert("Necesitas al menos 2 clientes");
     return;
   }
 
@@ -127,12 +130,11 @@ async function cargarDatos() {
   try {
 
     const res = await fetch(sheetURL);
-
-    if (!res.ok) throw new Error("No se pudo cargar CSV");
-
     const csv = await res.text();
 
-    if (!csv.includes("ZIP")) throw new Error("CSV incorrecto");
+    if (!csv.includes("ZIP")) {
+      throw new Error("CSV incorrecto");
+    }
 
     const data = csvToJSON(csv);
 
@@ -140,8 +142,8 @@ async function cargarDatos() {
 
     data.forEach(c => {
 
-      let lat = parseFloat(c.Lat);
-      let lng = parseFloat(c.Lng);
+      let lat = parseFloat((c.Lat || "").replace(/"/g, ""));
+      let lng = parseFloat((c.Lng || "").replace(/"/g, ""));
 
       if (isNaN(lat) || isNaN(lng)) return;
 
@@ -165,13 +167,13 @@ async function cargarDatos() {
 
         html += `
           <div class="cliente">
-            <b>${c.Nombre || ""}</b><br>
-            📞 ${c.Telefono || ""}<br>
-            📧 ${c.Email || ""}<br>
-            📍 ${c.Direccion || ""}<br>
-            🗑️ ${c.HoraBasura || ""}<br>
-            💳 ${c.Membresia || ""}<br>
-            🔄 ${c.Renovacion || ""}<br>
+            <b>${c.Nombre}</b><br>
+            📞 ${c.Telefono}<br>
+            📧 ${c.Email}<br>
+            📍 ${c.Direccion}<br>
+            🗑️ ${c.HoraBasura}<br>
+            💳 ${c.Membresia}<br>
+            🔄 ${c.Renovacion}<br>
 
             <span style="color:${color}">
               ${vencido ? "🔴 VENCIDO" : "🟢 ACTIVO"}
@@ -200,7 +202,7 @@ async function cargarDatos() {
 
   } catch (error) {
     console.error(error);
-    alert("❌ Error cargando datos. Revisa CSV o permisos.");
+    alert("❌ Error cargando datos");
   }
 }
 
