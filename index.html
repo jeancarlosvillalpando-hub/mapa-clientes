@@ -40,11 +40,12 @@
 
 <script>
 
+// 📍 MAPA
 var map = L.map('map').setView([29.7604, -95.3698], 10);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// 🔗 TU LINK CSV (YA BIEN)
+// 🔗 TU CSV (YA CORRECTO)
 const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?gid=1522286567&single=true&output=csv";
 
 // 📅 VALIDAR FECHA
@@ -62,7 +63,7 @@ function estaVencido(fecha) {
   return hoyClean > fechaCliente;
 }
 
-// 🔄 CSV ROBUSTO (ARREGLADO)
+// 🔄 CONVERTIR CSV A JSON (ROBUSTO)
 function csvToJSON(csv) {
   const lines = csv.trim().split("\n");
   const headers = lines[0].split(",");
@@ -76,9 +77,8 @@ function csvToJSON(csv) {
     let insideQuotes = false;
 
     for (let char of lines[i]) {
-      if (char === '"') {
-        insideQuotes = !insideQuotes;
-      } else if (char === ',' && !insideQuotes) {
+      if (char === '"') insideQuotes = !insideQuotes;
+      else if (char === ',' && !insideQuotes) {
         row.push(current);
         current = "";
       } else {
@@ -101,10 +101,13 @@ function csvToJSON(csv) {
   return result;
 }
 
-// 🚀 OPTIMIZAR RUTA
+// 🚀 OPTIMIZADOR DE RUTA
 function optimizarRuta(clientes) {
 
-  if (clientes.length < 2) return;
+  if (clientes.length < 2) {
+    alert("Necesitas al menos 2 clientes para ruta");
+    return;
+  }
 
   clientes.sort((a,b) => parseFloat(a.Lat) - parseFloat(b.Lat));
 
@@ -130,7 +133,7 @@ async function cargarDatos() {
 
     const csv = await res.text();
 
-    if (!csv.includes("ZIP")) throw new Error("El CSV no tiene encabezados correctos");
+    if (!csv.includes("ZIP")) throw new Error("CSV incorrecto");
 
     const data = csvToJSON(csv);
 
@@ -138,7 +141,10 @@ async function cargarDatos() {
 
     data.forEach(c => {
 
-      if (!c.Lat || !c.Lng) return;
+      let lat = parseFloat(c.Lat);
+      let lng = parseFloat(c.Lng);
+
+      if (isNaN(lat) || isNaN(lng)) return;
 
       if (!grupos[c.ZIP]) grupos[c.ZIP] = [];
       grupos[c.ZIP].push(c);
@@ -150,8 +156,6 @@ async function cargarDatos() {
 
       let lat = parseFloat(clientes[0].Lat);
       let lng = parseFloat(clientes[0].Lng);
-
-      if (isNaN(lat) || isNaN(lng)) continue;
 
       let html = `<div class="popup"><b>ZIP: ${zip}</b><br><br>`;
 
@@ -200,3 +204,10 @@ async function cargarDatos() {
     alert("❌ Error cargando datos. Revisa CSV o permisos.");
   }
 }
+
+cargarDatos();
+
+</script>
+
+</body>
+</html>
