@@ -46,7 +46,7 @@ var map = L.map('map').setView([29.7604, -95.3698], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 // 🔗 CSV CON PROXY (evita bloqueos)
-const sheetURL = "https://raw.githubusercontent.com/jeancarlosvillalpando-hub/mapa-clientes/main/clientes.csv";
+const sheetURL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(https://docs.google.com/spreadsheets/d/e/2PACX-1vTPQ2YtrYxaLo0nxjbYyR1vA9y0tz1FSlDnr-hX0tdjDL3xU9iqmXAsz3tCHlUavM9eWnc6lt0U5UUh/pub?gid=0&single=true&output=csv);
 // 📅 VALIDAR FECHA
 function estaVencido(fecha) {
   if (!fecha) return false;
