@@ -10,15 +10,8 @@
 
 <style>
 #map { height: 100vh; }
-
 .popup { max-height: 250px; overflow-y: auto; }
-
-.cliente {
-  border-bottom: 1px solid #ccc;
-  margin-bottom: 5px;
-  padding-bottom: 5px;
-}
-
+.cliente { border-bottom: 1px solid #ccc; margin-bottom: 5px; padding-bottom: 5px; }
 .btn {
   display: inline-block;
   margin-top: 3px;
@@ -46,11 +39,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?output=csv";
 
-// 📅 VALIDAR FECHA
+// 📅 FECHA
 function estaVencido(fecha) {
   if (!fecha) return false;
 
-  const partes = fecha.split("-");
+  const partes = fecha.trim().split("-");
+  if (partes.length !== 3) return false;
+
   const fechaCliente = new Date(partes[0], partes[1]-1, partes[2]);
 
   const hoy = new Date();
@@ -62,11 +57,12 @@ function estaVencido(fecha) {
 // 🔄 CSV
 function csvToJSON(csv) {
   const lines = csv.split("\n");
-  const headers = lines[0].split(",");
+  const headers = lines[0].split(",").map(h => h.trim());
+
   const result = [];
 
   for (let i = 1; i < lines.length; i++) {
-    if (!lines[i]) continue;
+    if (!lines[i].trim()) continue;
 
     let row = [];
     let current = "";
@@ -75,14 +71,14 @@ function csvToJSON(csv) {
     for (let char of lines[i]) {
       if (char === '"') insideQuotes = !insideQuotes;
       else if (char === ',' && !insideQuotes) {
-        row.push(current);
+        row.push(current.trim());
         current = "";
       } else current += char;
     }
-    row.push(current);
+    row.push(current.trim());
 
     let obj = {};
-    headers.forEach((h, j) => obj[h.trim()] = row[j]?.trim());
+    headers.forEach((h, j) => obj[h] = row[j]);
 
     result.push(obj);
   }
@@ -92,79 +88,104 @@ function csvToJSON(csv) {
 
 // 🚀 OPTIMIZADOR
 function optimizarRuta(clientes) {
+  clientes = clientes.filter(c => c.Direccion);
 
-  clientes.sort((a,b) => parseFloat(a.Lat) - parseFloat(b.Lat));
+  clientes.sort((a,b) => parseFloat(a.Lat || 0) - parseFloat(b.Lat || 0));
 
   let base = clientes[0].Direccion;
-  let waypoints = clientes.slice(1).map(c => encodeURIComponent(c.Direccion)).join("/");
+  let waypoints = clientes.slice(1)
+    .map(c => encodeURIComponent(c.Direccion))
+    .join("/");
 
   let url = `https://www.google.com/maps/dir/${encodeURIComponent(base)}/${waypoints}`;
-
   window.open(url);
 }
 
-// 🚀 CARGAR DATOS
+// 🚀 CARGAR
 async function cargarDatos() {
 
-  const res = await fetch(sheetURL);
-  const csv = await res.text();
-  const data = csvToJSON(csv);
+  try {
 
-  const grupos = {};
+    const res = await fetch(sheetURL);
+    const csv = await res.text();
+    const data = csvToJSON(csv);
 
-  data.forEach(c => {
-    if (!grupos[c.ZIP]) grupos[c.ZIP] = [];
-    grupos[c.ZIP].push(c);
-  });
+    console.log("DATA:", data);
 
-  for (const zip in grupos) {
+    const grupos = {};
 
-    const clientes = grupos[zip];
+    data.forEach(c => {
+      const zip = c.ZIP?.trim() || "Sin ZIP";
+      if (!grupos[zip]) grupos[zip] = [];
+      grupos[zip].push(c);
+    });
 
-    let lat = parseFloat(clientes[0].Lat);
-    let lng = parseFloat(clientes[0].Lng);
+    for (const zip in grupos) {
 
-    let html = `<div class="popup"><b>ZIP: ${zip}</b><br><br>`;
+      const clientes = grupos[zip];
 
-    clientes.forEach(c => {
+      let lat = null;
+      let lng = null;
 
-      let vencido = estaVencido(c.Renovacion);
-      let color = vencido ? "red" : "green";
+      for (const c of clientes) {
+        let latTemp = parseFloat(c.Lat);
+        let lngTemp = parseFloat(c.Lng);
 
-      html += `
+        if (!isNaN(latTemp) && !isNaN(lngTemp)) {
+          lat = latTemp;
+          lng = lngTemp;
+          break;
+        }
+      }
+
+      // 🔥 VALIDACIÓN CORRECTA
+      if (lat === null || lng === null) {
+        console.log("SIN COORDENADAS:", zip);
+        continue;
+      }
+
+      let html = `<div class="popup"><b>ZIP: ${zip}</b><br><br>`;
+
+      clientes.forEach(c => {
+
+        let vencido = estaVencido(c.Renovacion);
+        let color = vencido ? "red" : "green";
+
+        html += `
         <div class="cliente">
-          <b>${c.Nombre}</b><br>
-          📞 ${c.Telefono}<br>
-          📧 ${c.Email}<br>
-          📍 ${c.Direccion}<br>
-          🗑️ ${c.HoraBasura}<br>
-          💳 ${c.Membresia}<br>
-          🔄 ${c.Renovacion}<br>
+          <b>${c.Nombre || "-"}</b><br>
+          📞 ${c.Telefono || "-"}<br>
+          📧 ${c.Email || "-"}<br>
+          📍 ${c.Direccion || "-"}<br>
+          🗑️ ${c.HoraBasura || "-"}<br>
+          💳 ${c.Membresia || "-"}<br>
+          🔄 ${c.Renovacion || "-"}<br>
 
           <span style="color:${color}">
             ${vencido ? "🔴 VENCIDO" : "🟢 ACTIVO"}
           </span><br>
 
-          <a class="btn" href="tel:${c.Telefono}">📞 Llamar</a>
+          <a class="btn" href="tel:${c.Telefono || ""}">📞 Llamar</a>
 
           <a class="btn" target="_blank"
-          href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.Direccion)}">
+          href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.Direccion || "")}">
           📍 Ver en Maps
           </a>
-        </div>
-      `;
-    });
+        </div>`;
+      });
 
-    html += `
+      html += `
       <button onclick='optimizarRuta(${JSON.stringify(clientes)})'
       class="btn" style="background:green">
       🚀 Optimizar Ruta
-      </button>
-    `;
+      </button></div>`;
 
-    html += `</div>`;
+      L.marker([lat, lng]).addTo(map).bindPopup(html);
+    }
 
-    L.marker([lat, lng]).addTo(map).bindPopup(html);
+  } catch (err) {
+    console.error(err);
+    alert("Error cargando datos");
   }
 }
 
