@@ -46,8 +46,7 @@ var map = L.map('map').setView([29.7604, -95.3698], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 // 🔗 TU CSV (YA CORRECTO)
-const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?gid=1522286567&single=true&output=csv";
-
+const sheetURL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?gid=1522286567&single=true&output=csv");
 // 📅 VALIDAR FECHA
 function estaVencido(fecha) {
   if (!fecha) return false;
