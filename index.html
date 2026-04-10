@@ -45,8 +45,8 @@ var map = L.map('map').setView([29.7604, -95.3698], 10);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// 🔗 TU GOOGLE SHEETS (CORREGIDO)
-const sheetURL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vTPQ2YtrYxaLo0nxjbYyR1vA9y0tz1FSlDnr-hX0tdjDL3xU9iqmXAsz3tCHlUavM9eWnc6lt0U5UUh/pub?gid=0&single=true&output=csv");
+// 🔗 CSV (CORREGIDO + PROXY)
+const sheetURL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vTPQ2YtrYxaLo0nxjbYyR1vA9y0tz1FSlDnr-hX0tdjDL3xU9iqmXAsz3tCHlUavM9eWnc6lt0U5UUh/pub?output=csv");
 
 // 📅 VALIDAR FECHA
 function estaVencido(fecha) {
@@ -65,7 +65,7 @@ function estaVencido(fecha) {
   return hoyClean > fechaCliente;
 }
 
-// 🔄 CSV → JSON (ROBUSTO)
+// 🔄 CSV → JSON ROBUSTO
 function csvToJSON(csv) {
 
   const lines = csv.trim().split("\n");
@@ -169,12 +169,12 @@ async function cargarDatos() {
         html += `
           <div class="cliente">
             <b>${c.Nombre}</b><br>
-            📞 ${c.Telefono}<br>
-            📧 ${c.Email}<br>
-            📍 ${c.Direccion}<br>
-            🗑️ ${c.HoraBasura}<br>
-            💳 ${c.Membresia}<br>
-            🔄 ${c.Renovacion}<br>
+            📞 ${c.Telefono}</br>
+            📧 ${c.Email}</br>
+            📍 ${c.Direccion}</br>
+            🗑️ ${c.HoraBasura}</br>
+            💳 ${c.Membresia}</br>
+            🔄 ${c.Renovacion}</br>
 
             <span style="color:${color}">
               ${vencido ? "🔴 VENCIDO" : "🟢 ACTIVO"}
