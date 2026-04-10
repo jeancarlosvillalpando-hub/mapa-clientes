@@ -10,8 +10,15 @@
 
 <style>
 #map { height: 100vh; }
+
 .popup { max-height: 250px; overflow-y: auto; }
-.cliente { border-bottom: 1px solid #ccc; margin-bottom: 5px; padding-bottom: 5px; }
+
+.cliente {
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 5px;
+  padding-bottom: 5px;
+}
+
 .btn {
   display: inline-block;
   margin-top: 3px;
@@ -37,13 +44,14 @@ var map = L.map('map').setView([29.7604, -95.3698], 10);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?output=csv";
+// 🔗 TU LINK CSV (YA BIEN)
+const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDwas-598z0zi2L1YNtJv4L3zk3iVHQ_HGVIWbcaW1hd-AlZsNQ_VBrIezo_mLRg/pub?gid=1522286567&single=true&output=csv";
 
-// 📅 FECHA
+// 📅 VALIDAR FECHA
 function estaVencido(fecha) {
   if (!fecha) return false;
 
-  const partes = fecha.trim().split("-");
+  const partes = fecha.split("-");
   if (partes.length !== 3) return false;
 
   const fechaCliente = new Date(partes[0], partes[1]-1, partes[2]);
@@ -54,31 +62,38 @@ function estaVencido(fecha) {
   return hoyClean > fechaCliente;
 }
 
-// 🔄 CSV
+// 🔄 CSV ROBUSTO (ARREGLADO)
 function csvToJSON(csv) {
-  const lines = csv.split("\n");
-  const headers = lines[0].split(",").map(h => h.trim());
+  const lines = csv.trim().split("\n");
+  const headers = lines[0].split(",");
 
   const result = [];
 
   for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
 
     let row = [];
     let current = "";
     let insideQuotes = false;
 
     for (let char of lines[i]) {
-      if (char === '"') insideQuotes = !insideQuotes;
-      else if (char === ',' && !insideQuotes) {
-        row.push(current.trim());
+      if (char === '"') {
+        insideQuotes = !insideQuotes;
+      } else if (char === ',' && !insideQuotes) {
+        row.push(current);
         current = "";
-      } else current += char;
+      } else {
+        current += char;
+      }
     }
-    row.push(current.trim());
+
+    row.push(current);
+
+    if (row.length < headers.length) continue;
 
     let obj = {};
-    headers.forEach((h, j) => obj[h] = row[j]);
+    headers.forEach((h, j) => {
+      obj[h.trim()] = row[j]?.trim().replace(/^"|"$/g, "");
+    });
 
     result.push(obj);
   }
@@ -86,63 +101,57 @@ function csvToJSON(csv) {
   return result;
 }
 
-// 🚀 OPTIMIZADOR
+// 🚀 OPTIMIZAR RUTA
 function optimizarRuta(clientes) {
-  clientes = clientes.filter(c => c.Direccion);
 
-  clientes.sort((a,b) => parseFloat(a.Lat || 0) - parseFloat(b.Lat || 0));
+  if (clientes.length < 2) return;
+
+  clientes.sort((a,b) => parseFloat(a.Lat) - parseFloat(b.Lat));
 
   let base = clientes[0].Direccion;
+
   let waypoints = clientes.slice(1)
     .map(c => encodeURIComponent(c.Direccion))
     .join("/");
 
   let url = `https://www.google.com/maps/dir/${encodeURIComponent(base)}/${waypoints}`;
+
   window.open(url);
 }
 
-// 🚀 CARGAR
+// 🚀 CARGAR DATOS
 async function cargarDatos() {
 
   try {
 
     const res = await fetch(sheetURL);
-    const csv = await res.text();
-    const data = csvToJSON(csv);
 
-    console.log("DATA:", data);
+    if (!res.ok) throw new Error("No se pudo cargar CSV");
+
+    const csv = await res.text();
+
+    if (!csv.includes("ZIP")) throw new Error("El CSV no tiene encabezados correctos");
+
+    const data = csvToJSON(csv);
 
     const grupos = {};
 
     data.forEach(c => {
-      const zip = c.ZIP?.trim() || "Sin ZIP";
-      if (!grupos[zip]) grupos[zip] = [];
-      grupos[zip].push(c);
+
+      if (!c.Lat || !c.Lng) return;
+
+      if (!grupos[c.ZIP]) grupos[c.ZIP] = [];
+      grupos[c.ZIP].push(c);
     });
 
     for (const zip in grupos) {
 
       const clientes = grupos[zip];
 
-      let lat = null;
-      let lng = null;
+      let lat = parseFloat(clientes[0].Lat);
+      let lng = parseFloat(clientes[0].Lng);
 
-      for (const c of clientes) {
-        let latTemp = parseFloat(c.Lat);
-        let lngTemp = parseFloat(c.Lng);
-
-        if (!isNaN(latTemp) && !isNaN(lngTemp)) {
-          lat = latTemp;
-          lng = lngTemp;
-          break;
-        }
-      }
-
-      // 🔥 VALIDACIÓN CORRECTA
-      if (lat === null || lng === null) {
-        console.log("SIN COORDENADAS:", zip);
-        continue;
-      }
+      if (isNaN(lat) || isNaN(lng)) continue;
 
       let html = `<div class="popup"><b>ZIP: ${zip}</b><br><br>`;
 
@@ -152,46 +161,42 @@ async function cargarDatos() {
         let color = vencido ? "red" : "green";
 
         html += `
-        <div class="cliente">
-          <b>${c.Nombre || "-"}</b><br>
-          📞 ${c.Telefono || "-"}<br>
-          📧 ${c.Email || "-"}<br>
-          📍 ${c.Direccion || "-"}<br>
-          🗑️ ${c.HoraBasura || "-"}<br>
-          💳 ${c.Membresia || "-"}<br>
-          🔄 ${c.Renovacion || "-"}<br>
+          <div class="cliente">
+            <b>${c.Nombre || ""}</b><br>
+            📞 ${c.Telefono || ""}<br>
+            📧 ${c.Email || ""}<br>
+            📍 ${c.Direccion || ""}<br>
+            🗑️ ${c.HoraBasura || ""}<br>
+            💳 ${c.Membresia || ""}<br>
+            🔄 ${c.Renovacion || ""}<br>
 
-          <span style="color:${color}">
-            ${vencido ? "🔴 VENCIDO" : "🟢 ACTIVO"}
-          </span><br>
+            <span style="color:${color}">
+              ${vencido ? "🔴 VENCIDO" : "🟢 ACTIVO"}
+            </span><br>
 
-          <a class="btn" href="tel:${c.Telefono || ""}">📞 Llamar</a>
+            <a class="btn" href="tel:${c.Telefono}">📞 Llamar</a>
 
-          <a class="btn" target="_blank"
-          href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.Direccion || "")}">
-          📍 Ver en Maps
-          </a>
-        </div>`;
+            <a class="btn" target="_blank"
+            href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.Direccion)}">
+            📍 Ver en Maps
+            </a>
+          </div>
+        `;
       });
 
       html += `
-      <button onclick='optimizarRuta(${JSON.stringify(clientes)})'
-      class="btn" style="background:green">
-      🚀 Optimizar Ruta
-      </button></div>`;
+        <button onclick='optimizarRuta(${JSON.stringify(clientes)})'
+        class="btn" style="background:green">
+        🚀 Optimizar Ruta
+        </button>
+      </div>
+      `;
 
       L.marker([lat, lng]).addTo(map).bindPopup(html);
     }
 
-  } catch (err) {
-    console.error(err);
-    alert("Error cargando datos");
+  } catch (error) {
+    console.error(error);
+    alert("❌ Error cargando datos. Revisa CSV o permisos.");
   }
 }
-
-cargarDatos();
-
-</script>
-
-</body>
-</html>
